@@ -148,17 +148,21 @@ def _all_positions_distinct(positions):
     return len(set(tuple(row) for row in positions)) == len(positions)
 
 
-def get_closest_channels(channel_positions, channel_index, n=None):
+def get_closest_channels(channel_positions, channel_index, n=None, r=0.):
     """Get the channels closest to a given channel on the probe."""
     x = channel_positions[:, 0]
     y = channel_positions[:, 1]
     x0, y0 = channel_positions[channel_index]
     d = (x - x0) ** 2 + (y - y0) ** 2
-    out = np.argsort(d)
-    if n:
-        out = out[:n]
-    assert out[0] == channel_index
-    return out
+    if r > 0:
+        radius = r**2
+        out = [i for i in range(len(d)) if d[i] < radius]
+    else:
+        out = np.argsort(d)
+        if n:
+            out = out[:n]
+        assert out[0] == channel_index
+    return np.array(out)
 
 
 #------------------------------------------------------------------------------
@@ -335,7 +339,7 @@ class TemplateModel(object):
         self.sample_rate = float(self.sample_rate or 1.)
         assert self.sample_rate > 0
         self.offset = getattr(self, 'offset', 0)
-
+        self.radius = getattr(self, 'radius', 0.)
         self._load_data()
 
     #--------------------------------------------------------------------------
@@ -832,7 +836,7 @@ class TemplateModel(object):
         peak_channels = np.nonzero(amplitude >= amplitude_threshold * max_amp)[0]
         # Find N closest channels.
         close_channels = get_closest_channels(
-            self.channel_positions, best_channel, self.n_closest_channels)
+            self.channel_positions, best_channel, self.n_closest_channels, self.radius)
         assert best_channel in close_channels
         # Restrict to the channels belonging to the best channel's shank.
         if self.channel_shanks is not None:
